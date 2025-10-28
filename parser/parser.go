@@ -56,6 +56,9 @@ var CommandTypes = []CommandType{ //nolint: deadcode
 	token.COPY,
 	token.PASTE,
 	token.ENV,
+	token.IF,
+	token.ELSE,
+	token.ENDIF,
 }
 
 // String returns the string representation of the command.
@@ -67,6 +70,10 @@ type Command struct {
 	Options string
 	Args    string
 	Source  string
+	// For conditional commands (If, Else, EndIf)
+	Condition  *Command // The condition to evaluate (for If commands)
+	ElseIndex  int      // Index of Else command (-1 if no Else)
+	EndIfIndex int      // Index of EndIf command
 }
 
 // String returns the string representation of the command.
@@ -129,7 +136,59 @@ func (p *Parser) Parse() []Command {
 		p.nextToken()
 	}
 
+	// Post-process to link If/Else/EndIf blocks
+	p.linkConditionalBlocks(cmds)
+
 	return cmds
+}
+
+// linkConditionalBlocks populates the ElseIndex and EndIfIndex fields
+// for If and Else commands by matching them with their corresponding
+// Else and EndIf commands.
+func (p *Parser) linkConditionalBlocks(cmds []Command) {
+	// Stack to track nested If commands
+	type ifInfo struct {
+		ifIndex int
+		hasElse bool
+	}
+	stack := []ifInfo{}
+
+	for i := range cmds {
+		switch cmds[i].Type {
+		case token.IF:
+			stack = append(stack, ifInfo{ifIndex: i, hasElse: false})
+		case token.ELSE:
+			if len(stack) == 0 {
+				p.errors = append(p.errors, Error{Msg: "Else without matching If"})
+				continue
+			}
+			// Link If to Else
+			top := &stack[len(stack)-1]
+			if top.hasElse {
+				p.errors = append(p.errors, Error{Msg: "Multiple Else blocks for single If"})
+				continue
+			}
+			cmds[top.ifIndex].ElseIndex = i
+			top.hasElse = true
+		case token.ENDIF:
+			if len(stack) == 0 {
+				p.errors = append(p.errors, Error{Msg: "EndIf without matching If"})
+				continue
+			}
+			// Link If and Else to EndIf
+			top := stack[len(stack)-1]
+			cmds[top.ifIndex].EndIfIndex = i
+			if top.hasElse {
+				cmds[cmds[top.ifIndex].ElseIndex].EndIfIndex = i
+			}
+			stack = stack[:len(stack)-1]
+		}
+	}
+
+	// Check for unclosed If blocks
+	if len(stack) > 0 {
+		p.errors = append(p.errors, Error{Msg: "If without matching EndIf"})
+	}
 }
 
 // parseCommand parses a command.
@@ -181,6 +240,12 @@ func (p *Parser) parseCommand() []Command {
 		return []Command{p.parsePaste()}
 	case token.ENV:
 		return []Command{p.parseEnv()}
+	case token.IF:
+		return []Command{p.parseIf()}
+	case token.ELSE:
+		return []Command{p.parseElse()}
+	case token.ENDIF:
+		return []Command{p.parseEndIf()}
 	default:
 		p.errors = append(p.errors, NewError(p.cur, "Invalid command: "+p.cur.Literal))
 		return []Command{{Type: token.ILLEGAL}}
@@ -767,6 +832,56 @@ func (p *Parser) parseScreenshot() Command {
 	cmd.Args = path
 	p.nextToken()
 
+	return cmd
+}
+
+// parseIf parses an If command.
+// An If command takes a condition (currently only Wait is supported).
+//
+//	If Wait[@<time>] /regex/
+//	If /regex/
+func (p *Parser) parseIf() Command {
+	cmd := Command{Type: token.IF, ElseIndex: -1, EndIfIndex: -1}
+
+	// Check if the condition is a Wait command
+	if p.peek.Type == token.WAIT {
+		p.nextToken()
+		waitCmd := p.parseWait()
+		cmd.Condition = &waitCmd
+	} else if p.peek.Type == token.REGEX {
+		// Simple regex check on current screen
+		p.nextToken()
+		if _, err := regexp.Compile(p.cur.Literal); err != nil {
+			p.errors = append(p.errors, NewError(p.cur, fmt.Sprintf("Invalid regular expression '%s': %v", p.cur.Literal, err)))
+			return cmd
+		}
+		// Create a Wait command for screen check (no timeout)
+		waitCmd := Command{
+			Type:    token.WAIT,
+			Args:    "Screen " + p.cur.Literal,
+			Options: "0s", // Immediate check
+		}
+		cmd.Condition = &waitCmd
+	} else {
+		p.errors = append(p.errors, NewError(p.peek, "If expects Wait command or regex pattern"))
+	}
+
+	return cmd
+}
+
+// parseElse parses an Else command.
+//
+//	Else
+func (p *Parser) parseElse() Command {
+	cmd := Command{Type: token.ELSE, EndIfIndex: -1}
+	return cmd
+}
+
+// parseEndIf parses an EndIf command.
+//
+//	EndIf
+func (p *Parser) parseEndIf() Command {
+	cmd := Command{Type: token.ENDIF}
 	return cmd
 }
 

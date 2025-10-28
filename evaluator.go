@@ -138,11 +138,16 @@ func Evaluate(ctx context.Context, tape string, out io.Writer, opts ...Evaluator
 		}
 	}()
 
-	for _, cmd := range cmds[offset:] {
+	for i := offset; i < len(cmds); i++ {
+		cmd := cmds[i]
+
 		if ctx.Err() != nil {
 			teardown()
 			return []error{ctx.Err()}
 		}
+
+		// Reset nextCommandIndex before each command
+		v.nextCommandIndex = -1
 
 		// When changing the FontFamily, FontSize, LineHeight, Padding
 		// The xterm.js canvas changes dimensions and causes FFMPEG to not work
@@ -166,6 +171,11 @@ func Evaluate(ctx context.Context, tape string, out io.Writer, opts ...Evaluator
 		if err != nil {
 			teardown()
 			return []error{err}
+		}
+
+		// Handle conditional jumps
+		if v.nextCommandIndex >= 0 {
+			i = v.nextCommandIndex - 1 // -1 because loop will increment
 		}
 	}
 

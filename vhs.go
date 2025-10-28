@@ -21,18 +21,20 @@ import (
 
 // VHS is the object that controls the setup.
 type VHS struct {
-	Options      *Options
-	Errors       []error
-	Page         *rod.Page
-	browser      *rod.Browser
-	TextCanvas   *rod.Element
-	CursorCanvas *rod.Element
-	mutex        *sync.Mutex
-	started      bool
-	recording    bool
-	tty          *exec.Cmd
-	totalFrames  int
-	close        func() error
+	Options          *Options
+	Errors           []error
+	Page             *rod.Page
+	browser          *rod.Browser
+	TextCanvas       *rod.Element
+	CursorCanvas     *rod.Element
+	mutex            *sync.Mutex
+	started          bool
+	recording        bool
+	tty              *exec.Cmd
+	totalFrames      int
+	close            func() error
+	nextCommandIndex int  // For conditional jumps (-1 means continue normally)
+	conditionResult  bool // Result of last condition evaluation
 }
 
 // Options is the set of options for the setup.
@@ -115,9 +117,10 @@ func New() VHS {
 	mu := &sync.Mutex{}
 	opts := DefaultVHSOptions()
 	return VHS{
-		Options:   &opts,
-		recording: true,
-		mutex:     mu,
+		Options:          &opts,
+		recording:        true,
+		mutex:            mu,
+		nextCommandIndex: -1,
 	}
 }
 

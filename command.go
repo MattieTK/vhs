@@ -68,6 +68,9 @@ var CommandFuncs = map[parser.CommandType]CommandFunc{
 	token.PASTE:      ExecutePaste,
 	token.ENV:        ExecuteEnv,
 	token.WAIT:       ExecuteWait,
+	token.IF:         ExecuteIf,
+	token.ELSE:       ExecuteElse,
+	token.ENDIF:      ExecuteEndIf,
 }
 
 // ExecuteNoop is a no-op command that does nothing.
@@ -703,6 +706,70 @@ func ExecuteSetCursorBlink(c parser.Command, v *VHS) error {
 // ExecuteScreenshot is a CommandFunc that indicates a new screenshot must be taken.
 func ExecuteScreenshot(c parser.Command, v *VHS) error {
 	v.ScreenshotNextFrame(c.Args)
+	return nil
+}
+
+// ExecuteIf is a CommandFunc that evaluates a condition and branches accordingly.
+// It evaluates the condition (typically a Wait command) and if it fails (timeout),
+// jumps to the Else block (if present) or after the EndIf.
+func ExecuteIf(c parser.Command, v *VHS) error {
+	// Reset jump index
+	v.nextCommandIndex = -1
+
+	if c.Condition == nil {
+		return fmt.Errorf("If command has no condition")
+	}
+
+	// Execute the condition command directly
+	// For Wait commands, no error means success (pattern matched)
+	// Error means timeout/failure
+	var err error
+	switch c.Condition.Type {
+	case token.WAIT:
+		err = ExecuteWait(*c.Condition, v)
+	default:
+		return fmt.Errorf("unsupported condition type: %s", c.Condition.Type)
+	}
+
+	if err == nil {
+		// Condition succeeded - continue to next command (If block)
+		v.conditionResult = true
+		return nil
+	}
+
+	// Condition failed - jump to Else or EndIf
+	v.conditionResult = false
+	if c.ElseIndex >= 0 {
+		// Jump to Else block (skip to command after Else)
+		v.nextCommandIndex = c.ElseIndex + 1
+	} else if c.EndIfIndex >= 0 {
+		// No Else block - jump past EndIf
+		v.nextCommandIndex = c.EndIfIndex + 1
+	} else {
+		return fmt.Errorf("If command has no matching EndIf")
+	}
+
+	// Don't return the condition error since we handled it with branching
+	return nil
+}
+
+// ExecuteElse is a CommandFunc that handles the Else marker.
+// If we reach Else during normal execution, it means the If condition
+// succeeded, so we jump to EndIf.
+func ExecuteElse(c parser.Command, v *VHS) error {
+	// If we're executing Else, it means we came from the If block
+	// (condition was true), so we need to skip the Else block
+	if c.EndIfIndex >= 0 {
+		v.nextCommandIndex = c.EndIfIndex + 1
+	} else {
+		return fmt.Errorf("Else command has no matching EndIf")
+	}
+	return nil
+}
+
+// ExecuteEndIf is a CommandFunc that handles the EndIf marker.
+// This is essentially a no-op since we just continue execution.
+func ExecuteEndIf(_ parser.Command, _ *VHS) error {
 	return nil
 }
 

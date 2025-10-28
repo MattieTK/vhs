@@ -82,6 +82,9 @@ const (
 	PASTE           = "PASTE"
 	SHELL           = "SHELL"
 	ENV             = "ENV"
+	IF              = "IF"
+	ELSE            = "ELSE"
+	ENDIF           = "ENDIF"
 	FONT_FAMILY     = "FONT_FAMILY" //nolint:revive
 	FONT_SIZE       = "FONT_SIZE"   //nolint:revive
 	FRAMERATE       = "FRAMERATE"
@@ -165,6 +168,9 @@ var Keywords = map[string]Type{
 	"Copy":          COPY,
 	"Paste":         PASTE,
 	"Env":           ENV,
+	"If":            IF,
+	"Else":          ELSE,
+	"EndIf":         ENDIF,
 }
 
 // IsSetting returns whether a token is a setting.
@@ -186,7 +192,8 @@ func IsCommand(t Type) bool {
 	case TYPE, SLEEP,
 		UP, DOWN, RIGHT, LEFT, PAGE_UP, PAGE_DOWN,
 		ENTER, BACKSPACE, DELETE, TAB,
-		ESCAPE, HOME, INSERT, END, CTRL, SOURCE, SCREENSHOT, COPY, PASTE, WAIT:
+		ESCAPE, HOME, INSERT, END, CTRL, SOURCE, SCREENSHOT, COPY, PASTE, WAIT,
+		IF, ELSE, ENDIF:
 		return true
 	default:
 		return false
