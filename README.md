@@ -230,6 +230,7 @@ There are a few basic types of VHS commands:
 - [`Ctrl[+Alt][+Shift]+<char>`](#ctrl): press control + key and/or modifier
 - [`Sleep <time>`](#sleep): wait for a certain amount of time
 - [`Wait[+Screen][+Line] /regex/`](#wait): wait for specific conditions
+- [`If`](#conditionals) [`Else`](#conditionals) [`EndIf`](#conditionals): conditional execution based on pattern matching
 - [`Hide`](#hide): hide commands from output
 - [`Show`](#show): stop hiding commands from output
 - [`Screenshot`](#screenshot): screenshot the current frame
@@ -688,6 +689,126 @@ Wait+Line@10ms  /World/
 
 The default regular expression is `/>$/`, the wait timeout is `15s`, and the
 default scope is `Line`.
+
+### Conditionals
+
+VHS supports conditional execution of commands based on pattern matching with timeout support. This allows you to create adaptive terminal recordings that branch based on whether certain patterns appear in the output.
+
+#### Basic If/Else/EndIf Structure
+
+```elixir
+If Wait@10s /regex/
+    Type "Pattern found within 10 seconds!"
+    Enter
+Else
+    Type "Pattern not found - timeout occurred!"
+    Enter
+EndIf
+```
+
+#### How It Works
+
+- **Pattern Match Success**: If the Wait command finds the pattern before the timeout, the commands in the If block execute, and the Else block is skipped.
+- **Timeout**: If the Wait command times out, execution jumps to the Else block (if present), or continues after EndIf.
+- **Immediate Check**: Using `If /regex/` without Wait performs an immediate check on the current screen with no timeout.
+
+#### If Without Else
+
+You can omit the Else block if you only need to execute commands when the condition succeeds:
+
+```elixir
+If Wait@3s /success/
+    Type "# Command succeeded!"
+    Enter
+EndIf
+```
+
+#### Examples
+
+Check if a command succeeded:
+
+```elixir
+Type "which python3"
+Enter
+
+If Wait@2s /\/bin\/python3/
+    Type "# Python3 found, running script..."
+    Enter
+    Type "python3 script.py"
+    Enter
+Else
+    Type "# Python3 not found, installing..."
+    Enter
+EndIf
+```
+
+Conditional file operations:
+
+```elixir
+Type "ls myfile.txt"
+Enter
+Sleep 500ms
+
+If Wait@3s /myfile.txt/
+    Type "# File exists, creating backup"
+    Enter
+    Type "cp myfile.txt myfile.bak"
+    Enter
+Else
+    Type "# File not found, creating new file"
+    Enter
+    Type "touch myfile.txt"
+    Enter
+EndIf
+```
+
+#### Nested Conditionals
+
+Conditionals can be nested to create complex branching logic:
+
+```elixir
+Type "uname -s"
+Enter
+
+If Wait@2s /Linux/
+    Type "# Detected Linux"
+    Enter
+
+    If Wait@2s /Ubuntu/
+        Type "# Ubuntu - using apt"
+        Enter
+    Else
+        Type "# Other Linux distro"
+        Enter
+    EndIf
+Else
+    Type "# Not Linux"
+    Enter
+EndIf
+```
+
+#### Wait Options in Conditionals
+
+The Wait command within If supports all standard Wait options:
+
+```elixir
+# Wait for pattern on current line
+If Wait+Line@3s />$/
+    Type "# Found prompt"
+    Enter
+EndIf
+
+# Wait for pattern anywhere on screen
+If Wait+Screen@5s /ERROR/
+    Type "# Error detected!"
+    Enter
+Else
+    Type "# No errors found"
+    Enter
+EndIf
+```
+
+For more examples, see the [`examples/conditional-*.tape`](./examples/) files.
 
 ### Sleep
 
