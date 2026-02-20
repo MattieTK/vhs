@@ -75,7 +75,7 @@ func ShellConfig(name, promptColor string) (env []string, command []string) {
 			fmt.Sprintf(`Set-PSReadLineOption -HistorySaveStyle SaveNothing; Function prompt { [Console]::Write([char]27 + ']7777;' + [char]7); Write-Host -ForegroundColor ([System.Drawing.Color]::FromArgb(%d,%d,%d)) -NoNewLine '>'; return ' ' }`, r, g, b),
 		}
 	case cmdexe:
-		return nil, []string{"cmd.exe", "/k", "prompt=^> "}
+		return nil, []string{"cmd.exe", "/k", fmt.Sprintf("prompt=$E]7777;$E\\$E[38;2;%d;%d;%dm^> $E[0m", r, g, b)}
 	case nushell:
 		return nil, []string{"nu", "--execute", fmt.Sprintf(`$env.PROMPT_COMMAND = {print -n ($"\e]7777;\u{07}"); $"\e[;38;2;%d;%d;%dm>\e[m "}; $env.PROMPT_COMMAND_RIGHT = {''}`, r, g, b)}
 	case osh:

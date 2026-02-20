@@ -70,7 +70,7 @@ func init() {
 		token.COPY:       ExecuteCopy,
 		token.PASTE:      ExecutePaste,
 		token.ENV:        ExecuteEnv,
-		token.AWAIT:      ExecuteAwait,
+		token.AWAIT_PROMPT: ExecuteAwaitPrompt,
 		token.WAIT:       ExecuteWait,
 	}
 }
@@ -173,10 +173,10 @@ func ExecuteWait(c parser.Command, v *VHS) error {
 	}
 }
 
-// ExecuteAwait waits for the shell to render a new prompt, indicating it is
+// ExecuteAwaitPrompt waits for the shell to render a new prompt, indicating it is
 // ready for input. Uses OSC 7777 markers embedded in shell prompts.
-// Supports an optional @timeout (e.g. Await@30s), defaulting to WaitTimeout.
-func ExecuteAwait(c parser.Command, v *VHS) error {
+// Supports an optional @timeout (e.g. AwaitPrompt@30s), defaulting to WaitTimeout.
+func ExecuteAwaitPrompt(c parser.Command, v *VHS) error {
 	timeout := v.Options.WaitTimeout
 	if c.Options != "" {
 		t, err := time.ParseDuration(c.Options)
