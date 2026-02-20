@@ -38,36 +38,40 @@ func Execute(c parser.Command, v *VHS) error {
 type CommandFunc func(c parser.Command, v *VHS) error
 
 // CommandFuncs maps command types to their executable functions.
-var CommandFuncs = map[parser.CommandType]CommandFunc{
-	token.BACKSPACE:  ExecuteKey(input.Backspace),
-	token.DELETE:     ExecuteKey(input.Delete),
-	token.INSERT:     ExecuteKey(input.Insert),
-	token.DOWN:       ExecuteKey(input.ArrowDown),
-	token.ENTER:      ExecuteKey(input.Enter),
-	token.LEFT:       ExecuteKey(input.ArrowLeft),
-	token.RIGHT:      ExecuteKey(input.ArrowRight),
-	token.SPACE:      ExecuteKey(input.Space),
-	token.UP:         ExecuteKey(input.ArrowUp),
-	token.TAB:        ExecuteKey(input.Tab),
-	token.ESCAPE:     ExecuteKey(input.Escape),
-	token.PAGE_UP:    ExecuteKey(input.PageUp),
-	token.PAGE_DOWN:  ExecuteKey(input.PageDown),
-	token.HIDE:       ExecuteHide,
-	token.REQUIRE:    ExecuteRequire,
-	token.SHOW:       ExecuteShow,
-	token.SET:        ExecuteSet,
-	token.OUTPUT:     ExecuteOutput,
-	token.SLEEP:      ExecuteSleep,
-	token.TYPE:       ExecuteType,
-	token.CTRL:       ExecuteCtrl,
-	token.ALT:        ExecuteAlt,
-	token.SHIFT:      ExecuteShift,
-	token.ILLEGAL:    ExecuteNoop,
-	token.SCREENSHOT: ExecuteScreenshot,
-	token.COPY:       ExecuteCopy,
-	token.PASTE:      ExecutePaste,
-	token.ENV:        ExecuteEnv,
-	token.WAIT:       ExecuteWait,
+var CommandFuncs map[parser.CommandType]CommandFunc
+
+func init() {
+	CommandFuncs = map[parser.CommandType]CommandFunc{
+		token.BACKSPACE:  ExecuteKey(input.Backspace),
+		token.DELETE:     ExecuteKey(input.Delete),
+		token.INSERT:     ExecuteKey(input.Insert),
+		token.DOWN:       ExecuteKey(input.ArrowDown),
+		token.ENTER:      ExecuteKey(input.Enter),
+		token.LEFT:       ExecuteKey(input.ArrowLeft),
+		token.RIGHT:      ExecuteKey(input.ArrowRight),
+		token.SPACE:      ExecuteKey(input.Space),
+		token.UP:         ExecuteKey(input.ArrowUp),
+		token.TAB:        ExecuteKey(input.Tab),
+		token.ESCAPE:     ExecuteKey(input.Escape),
+		token.PAGE_UP:    ExecuteKey(input.PageUp),
+		token.PAGE_DOWN:  ExecuteKey(input.PageDown),
+		token.HIDE:       ExecuteHide,
+		token.REQUIRE:    ExecuteRequire,
+		token.SHOW:       ExecuteShow,
+		token.SET:        ExecuteSet,
+		token.OUTPUT:     ExecuteOutput,
+		token.SLEEP:      ExecuteSleep,
+		token.TYPE:       ExecuteType,
+		token.CTRL:       ExecuteCtrl,
+		token.ALT:        ExecuteAlt,
+		token.SHIFT:      ExecuteShift,
+		token.ILLEGAL:    ExecuteNoop,
+		token.SCREENSHOT: ExecuteScreenshot,
+		token.COPY:       ExecuteCopy,
+		token.PASTE:      ExecutePaste,
+		token.ENV:        ExecuteEnv,
+		token.WAIT:       ExecuteWait,
+	}
 }
 
 // ExecuteNoop is a no-op command that does nothing.
@@ -107,12 +111,19 @@ func ExecuteKey(k input.Key) CommandFunc {
 const WaitTick = 10 * time.Millisecond
 
 // ExecuteWait is a CommandFunc that waits for a regex match for the given amount of time.
+// If the scope ends with "?" the wait is optional: a timeout returns nil instead of an error,
+// and any commands in c.Block are executed only when the pattern matches.
 func ExecuteWait(c parser.Command, v *VHS) error {
 	scope, rxStr, ok := strings.Cut(c.Args, " ")
 	rx := v.Options.WaitPattern
 	if ok {
 		// This is validated on parse so using MustCompile reduces noise.
 		rx = regexp.MustCompile(rxStr)
+	}
+
+	optional := strings.HasSuffix(scope, "?")
+	if optional {
+		scope = strings.TrimSuffix(scope, "?")
 	}
 
 	timeout := v.Options.WaitTimeout
@@ -141,7 +152,7 @@ func ExecuteWait(c parser.Command, v *VHS) error {
 			last = line
 
 			if rx.MatchString(line) {
-				return nil
+				return executeBlock(c.Block, v)
 			}
 		case "Screen":
 			lines, err := v.Buffer()
@@ -151,7 +162,7 @@ func ExecuteWait(c parser.Command, v *VHS) error {
 			last = strings.Join(lines, "\n")
 
 			if rx.MatchString(last) {
-				return nil
+				return executeBlock(c.Block, v)
 			}
 		default:
 			// Should be impossible due to parse validation, but we don't want to
@@ -163,9 +174,22 @@ func ExecuteWait(c parser.Command, v *VHS) error {
 		case <-checkT.C:
 			continue
 		case <-timeoutT.C:
+			if optional {
+				return nil
+			}
 			return fmt.Errorf("timeout waiting for %q to match %s; last value was: %s", c.Args, rx.String(), last)
 		}
 	}
+}
+
+// executeBlock runs a slice of sub-commands sequentially.
+func executeBlock(block []parser.Command, v *VHS) error {
+	for _, cmd := range block {
+		if err := Execute(cmd, v); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // ExecuteCtrl is a CommandFunc that presses the argument keys and/or modifiers

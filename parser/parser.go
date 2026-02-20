@@ -67,6 +67,7 @@ type Command struct {
 	Options string
 	Args    string
 	Source  string
+	Block   []Command
 }
 
 // String returns the string representation of the command.
@@ -181,6 +182,9 @@ func (p *Parser) parseCommand() []Command {
 		return []Command{p.parsePaste()}
 	case token.ENV:
 		return []Command{p.parseEnv()}
+	case token.ENDWAIT:
+		p.errors = append(p.errors, NewError(p.cur, "EndWait without matching Wait?"))
+		return []Command{{Type: token.ILLEGAL}}
 	default:
 		p.errors = append(p.errors, NewError(p.cur, "Invalid command: "+p.cur.Literal))
 		return []Command{{Type: token.ILLEGAL}}
@@ -211,6 +215,14 @@ func (p *Parser) parseWait() Command {
 		}
 	}
 
+	// Optional suffix: Wait+Screen@5s? makes timeout non-fatal.
+	optional := false
+	if p.peek.Type == token.QUESTION {
+		optional = true
+		cmd.Args += "?"
+		p.nextToken()
+	}
+
 	if p.peek.Type != token.REGEX {
 		// fallback to default
 		return cmd
@@ -222,6 +234,23 @@ func (p *Parser) parseWait() Command {
 	}
 
 	cmd.Args += " " + p.cur.Literal
+
+	// Collect block commands between Wait? and EndWait.
+	if optional {
+		for {
+			p.nextToken()
+			if p.cur.Type == token.ENDWAIT || p.cur.Type == token.EOF {
+				break
+			}
+			if p.cur.Type == token.COMMENT {
+				continue
+			}
+			cmd.Block = append(cmd.Block, p.parseCommand()...)
+		}
+		if p.cur.Type != token.ENDWAIT {
+			p.errors = append(p.errors, NewError(p.cur, "Expected EndWait to close Wait? block"))
+		}
+	}
 
 	return cmd
 }
