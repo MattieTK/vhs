@@ -32,6 +32,7 @@ const (
 	RIGHT_BRACKET = "]" //nolint:revive
 	LEFT_BRACKET  = "[" //nolint:revive
 	CARET         = "^"
+	QUESTION      = "?"
 
 	EM           = "EM"
 	MILLISECONDS = "MILLISECONDS"
@@ -100,6 +101,7 @@ const (
 	WINDOW_BAR_SIZE = "WINDOW_BAR_SIZE" //nolint:revive
 	BORDER_RADIUS   = "CORNER_RADIUS"   //nolint:revive
 	WAIT            = "WAIT"            //nolint:revive
+	ENDWAIT         = "ENDWAIT"         //nolint:revive
 	WAIT_TIMEOUT    = "WAIT_TIMEOUT"    //nolint:revive
 	WAIT_PATTERN    = "WAIT_PATTERN"    //nolint:revive
 	CURSOR_BLINK    = "CURSOR_BLINK"    //nolint:revive
@@ -158,6 +160,7 @@ var Keywords = map[string]Type{
 	"WaitTimeout":   WAIT_TIMEOUT,
 	"WaitPattern":   WAIT_PATTERN,
 	"Wait":          WAIT,
+	"EndWait":       ENDWAIT,
 	"Source":        SOURCE,
 	"CursorBlink":   CURSOR_BLINK,
 	"PromptColor":   PROMPT_COLOR,

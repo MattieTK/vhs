@@ -61,6 +61,9 @@ func (l *Lexer) NextToken() token.Token {
 	case '\\':
 		tok = l.newToken(token.BACKSLASH, l.ch)
 		l.readChar()
+	case '?':
+		tok = l.newToken(token.QUESTION, l.ch)
+		l.readChar()
 	case '#':
 		tok.Type = token.COMMENT
 		tok.Literal = l.readComment()
