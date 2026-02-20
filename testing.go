@@ -81,6 +81,26 @@ func (v *VHS) Buffer() ([]string, error) {
 	return lines, nil
 }
 
+// OutputBuffer returns the accumulated raw terminal output with ANSI codes stripped.
+// This captures all data written to the terminal, even text that was later
+// overwritten by cursor manipulation (e.g. interactive CLIs built with Ink).
+func (v *VHS) OutputBuffer() (string, error) {
+	buf, err := v.Page.Eval("() => window.__vhs_output || ''")
+	if err != nil {
+		return "", fmt.Errorf("read output buffer: %w", err)
+	}
+	return buf.Value.Str(), nil
+}
+
+// ClearOutputBuffer resets the accumulated output buffer.
+func (v *VHS) ClearOutputBuffer() error {
+	_, err := v.Page.Eval("() => { window.__vhs_output = ''; }")
+	if err != nil {
+		return fmt.Errorf("clear output buffer: %w", err)
+	}
+	return nil
+}
+
 // CurrentLine returns the current line from the buffer.
 func (v *VHS) CurrentLine() (string, error) {
 	buf, err := v.Page.Eval("() => term.buffer.active.getLine(term.buffer.active.cursorY+term.buffer.active.viewportY).translateToString().trimEnd()")

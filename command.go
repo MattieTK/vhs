@@ -153,6 +153,19 @@ func ExecuteWait(c parser.Command, v *VHS) error {
 			if rx.MatchString(last) {
 				return nil
 			}
+		case "Output":
+			output, err := v.OutputBuffer()
+			if err != nil {
+				return fmt.Errorf("failed to get output buffer: %w", err)
+			}
+			last = output
+
+			if rx.MatchString(output) {
+				if err := v.ClearOutputBuffer(); err != nil {
+					return fmt.Errorf("failed to clear output buffer: %w", err)
+				}
+				return nil
+			}
 		default:
 			// Should be impossible due to parse validation, but we don't want to
 			// hang if it does happen due to a bug.

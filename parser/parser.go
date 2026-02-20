@@ -192,8 +192,8 @@ func (p *Parser) parseWait() Command {
 
 	if p.peek.Type == token.PLUS {
 		p.nextToken()
-		if p.peek.Type != token.STRING || (p.peek.Literal != "Line" && p.peek.Literal != "Screen") {
-			p.errors = append(p.errors, NewError(p.peek, "Wait+ expects Line or Screen"))
+		if (p.peek.Type != token.STRING && p.peek.Type != token.OUTPUT) || (p.peek.Literal != "Line" && p.peek.Literal != "Screen" && p.peek.Literal != "Output") {
+			p.errors = append(p.errors, NewError(p.peek, "Wait+ expects Line, Screen, or Output"))
 			return cmd
 		}
 		cmd.Args = p.peek.Literal
