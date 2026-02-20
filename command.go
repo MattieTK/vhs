@@ -70,6 +70,7 @@ func init() {
 		token.COPY:       ExecuteCopy,
 		token.PASTE:      ExecutePaste,
 		token.ENV:        ExecuteEnv,
+		token.AWAIT_PROMPT: ExecuteAwaitPrompt,
 		token.WAIT:       ExecuteWait,
 	}
 }
@@ -203,6 +204,45 @@ func executeBlock(block []parser.Command, v *VHS) error {
 		}
 	}
 	return nil
+}
+
+// ExecuteAwaitPrompt waits for the shell to render a new prompt, indicating it is
+// ready for input. Uses OSC 7777 markers embedded in shell prompts.
+// Supports an optional @timeout (e.g. AwaitPrompt@30s), defaulting to WaitTimeout.
+func ExecuteAwaitPrompt(c parser.Command, v *VHS) error {
+	timeout := v.Options.WaitTimeout
+	if c.Options != "" {
+		t, err := time.ParseDuration(c.Options)
+		if err != nil {
+			return fmt.Errorf("failed to parse duration: %w", err)
+		}
+		timeout = t
+	}
+
+	before, err := v.PromptCount()
+	if err != nil {
+		return fmt.Errorf("failed to read prompt count: %w", err)
+	}
+
+	checkT := time.NewTicker(WaitTick)
+	defer checkT.Stop()
+	timeoutT := time.NewTimer(timeout)
+	defer timeoutT.Stop()
+
+	for {
+		select {
+		case <-checkT.C:
+			current, err := v.PromptCount()
+			if err != nil {
+				return fmt.Errorf("failed to read prompt count: %w", err)
+			}
+			if current > before {
+				return nil
+			}
+		case <-timeoutT.C:
+			return fmt.Errorf("timeout waiting for shell prompt (AwaitPrompt)")
+		}
+	}
 }
 
 // ExecuteCtrl is a CommandFunc that presses the argument keys and/or modifiers

@@ -188,13 +188,18 @@ func (vhs *VHS) Setup() {
 	// Fit the terminal into the window
 	vhs.Page.MustEval("term.fit")
 
-	// Hook into term.write to capture all output for Wait+Output matching.
-	// Strips ANSI escape sequences so regex matching works against plain text.
+	// Hook into term.write to capture output and track prompt markers.
 	vhs.Page.MustEval(`() => {
 		window.__vhs_output = '';
+		window.__vhs_prompt_count = 0;
 		var ow = term.write.bind(term);
 		term.write = function(d, c) {
 			var t = typeof d === 'string' ? d : new TextDecoder().decode(d);
+			var idx = t.indexOf('\x1b]7777;');
+			while (idx !== -1) {
+				window.__vhs_prompt_count++;
+				idx = t.indexOf('\x1b]7777;', idx + 1);
+			}
 			t = t.replace(/\x1b\[[0-9;?]*[a-zA-Z@]/g, '');
 			t = t.replace(/\x1b\][^\x07]*\x07/g, '');
 			t = t.replace(/\x1b[()#][A-Z0-9]/g, '');
