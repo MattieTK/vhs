@@ -50,6 +50,7 @@ var CommandTypes = []CommandType{ //nolint: deadcode
 	token.TAB,
 	token.TYPE,
 	token.UP,
+	token.AWAIT,
 	token.WAIT,
 	token.SOURCE,
 	token.SCREENSHOT,
@@ -169,6 +170,8 @@ func (p *Parser) parseCommand() []Command {
 		return []Command{p.parseRequire()}
 	case token.SHOW:
 		return []Command{p.parseShow()}
+	case token.AWAIT:
+		return []Command{p.parseAwait()}
 	case token.WAIT:
 		return []Command{p.parseWait()}
 	case token.SOURCE:
@@ -223,6 +226,19 @@ func (p *Parser) parseWait() Command {
 
 	cmd.Args += " " + p.cur.Literal
 
+	return cmd
+}
+
+func (p *Parser) parseAwait() Command {
+	cmd := Command{Type: token.AWAIT}
+	cmd.Options = p.parseSpeed()
+	if cmd.Options != "" {
+		dur, _ := time.ParseDuration(cmd.Options)
+		if dur <= 0 {
+			p.errors = append(p.errors, NewError(p.peek, "Await expects positive duration"))
+			return cmd
+		}
+	}
 	return cmd
 }
 
